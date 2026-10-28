@@ -7,15 +7,26 @@ jobs:
       contents: write
     steps:
     - uses: actions/checkout@v4
+    
     - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
+        
+    # هذه الخطوة ستظهر لنا قائمة الملفات لنتأكد من وجود gradlew
+    - name: List files
+      run: ls -la
+      
+    # هذه الخطوة تعطي صلاحية التنفيذ لملف البناء
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+      
+    # هذه الخطوة تبدأ عملية البناء الفعلية
     - name: Build with Gradle
       run: ./gradlew assembleDebug
+      
+    # هذه الخطوة ترفع ملف التطبيق بعد نجاح البناء
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
