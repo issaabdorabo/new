@@ -3,56 +3,28 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
+    
     - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Find Gradlew and Set Project Root
-      id: find_root
-      run: |
-        GRADLEW_PATH=$(find . -name "gradlew" -type f | head -n 1)
-        if [ -z "$GRADLEW_PATH" ]; then
-          echo "::error::لم يتم العثور على ملف gradlew في المستودع. تأكد من رفعه."
-          exit 1
-        fi
-        DIR=$(dirname "$GRADLEW_PATH")
-        echo "PROJECT_ROOT=$DIR" >> $GITHUB_OUTPUT
-        echo "Found project root at: $DIR"
-
-    - name: List Project Files
-      run: ls -la ${{ steps.find_root.outputs.PROJECT_ROOT }}
-
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      working-directory: ${{ steps.find_root.outputs.PROJECT_ROOT }}
-
-    - name: Fix Line Endings
-      run: sed -i 's/\r$//' gradlew
-      working-directory: ${{ steps.find_root.outputs.PROJECT_ROOT }}
-
-    - name: Check Gradle Wrapper JAR
-      run: |
-        if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-          echo "::error::ملف gradle-wrapper.jar مفقود. قد يكون مستبعداً بواسطة .gitignore."
-          exit 1
-        fi
-      working-directory: ${{ steps.find_root.outputs.PROJECT_ROOT }}
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.7'
 
     - name: Build with Gradle
-      run: ./gradlew assembleDebug
-      working-directory: ${{ steps.find_root.outputs.PROJECT_ROOT }}
-
+      run: gradle assembleDebug
+      
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: ${{ steps.find_root.outputs.PROJECT_ROOT }}/app/build/outputs/apk/debug/app-debug.apk
+        # هذا المسار يبحث عن ملف التطبيق في المكانين (مع أو بدون مجلد app)
+        path: |
+          app/build/outputs/apk/debug/app-debug.apk
+          build/outputs/apk/debug/app-debug.apk
