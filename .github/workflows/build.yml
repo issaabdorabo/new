@@ -15,7 +15,6 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
-        # قمنا بتحديث الإصدار هنا ليتوافق مع مشروعك
         gradle-version: '9.3.1'
 
     - name: Build with Gradle
