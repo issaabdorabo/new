@@ -1,6 +1,0 @@
-{
-  "name": "قطع غيار Pro",
-  "description": "تطبيق متكامل لإدارة متجر قطع غيار السيارات والمخزون والطلبات والصرف والتقارير بدون إنترنت",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
