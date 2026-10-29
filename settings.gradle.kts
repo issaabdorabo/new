@@ -23,6 +23,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AutoPartsPro"
-
-include(":app")
-project(":app").projectDir = file(".")
