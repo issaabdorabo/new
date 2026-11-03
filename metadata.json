@@ -1,6 +1,0 @@
-{
-  "name": "قطع غيار Pro",
-  "description": "نظام احترافي متكامل لإدارة قطع الغيار والمخزون وطلبيات الموردين والعملاء والمزامنة السحابية",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
