@@ -38,7 +38,7 @@ object AdMobManager {
     private const val TAG = "AdMobManager"
 
     // Official Google Test Ad Unit IDs
-    const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
+    const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-9896093579884400/1208061802"
     const val TEST_APP_OPEN_AD_UNIT_ID = "ca-app-pub-3940256099942544/9257390508"
 
     private var appOpenAd: AppOpenAd? = null
