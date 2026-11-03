@@ -1,8 +1,0 @@
-{
-  "name": "قطع غيارpro",
-  "description": "تطبيق قطع غيارpro المتكامل لإدارة المخزون والمبيعات والموردين والأجهزة",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
