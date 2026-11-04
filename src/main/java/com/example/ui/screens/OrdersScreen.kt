@@ -291,6 +291,7 @@ fun OrdersScreen(
 // ----------------------------------------------------
 // Tab A: "العرض الجماعي" (Matrix View with frozen first column & Bulk Confirmation)
 // ----------------------------------------------------
+
 @Composable
 fun MatrixGroupView(
     matrixRows: List<MatrixRow>,
@@ -647,12 +648,383 @@ fun MatrixGroupView(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            text = "$grandTotal",
+@Composable
+fun MatrixGroupView(
+    matrixRows: List<MatrixRow>,
+    customers: List<CustomerEntity>,
+    onCellClick: (customerId: Long, partId: Long, newQty: Int) -> Unit,
+    onShareMatrix: () -> Unit,
+    onAddPart: () -> Unit,
+    onAddCustomer: () -> Unit,
+    onConfirmBulkSupplierOrders: (orderDate: String, confirmedDate: String, notes: String) -> Unit,
+    onClearMatrix: () -> Unit = {},
+    isEditingBatch: Boolean = false,
+    onSaveMatrixAsCustomerOrders: (orderDate: String) -> Unit = {}
+) {
+    val context = LocalContext.current
+    var cellToEdit by remember { mutableStateOf<Triple<PartEntity, CustomerEntity, Int>?>(null) }
+    var showBulkConfirmDialog by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var showSaveOrderDialog by remember { mutableStateOf(false) }
+
+    val customerGradients = listOf(
+        listOf(Color(0xFF1E3A8A), Color(0xFF3B82F6)),
+        listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
+        listOf(Color(0xFF047857), Color(0xFF10B981)),
+        listOf(Color(0xFF7C3AED), Color(0xFF8B5CF6)),
+        listOf(Color(0xFFBE123C), Color(0xFFF43F5E))
+    )
+
+    val totalRequiredPieces = matrixRows.sumOf { it.totalQty }
+
+    // أبعاد الجدول (موحدة لضمان تطابق الأعمدة بين الرأس والصفوف)
+    val fixedColWidth = 140.dp
+    val customerColWidth = 90.dp
+    val totalColWidth = 80.dp
+    val headerHeight = 52.dp
+    val rowHeight = 60.dp
+    val summaryHeight = 50.dp
+
+    // حالة التمرير الأفقي المشتركة بين الرأس والصفوف والملخص
+    val horizontalScrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp)
+    ) {
+        // ============ شريط الأدوات العلوي (كما هو دون تغيير) ============
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "جدول الطلبات الجماعي للأصناف والعملاء",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "المطلوب: $totalRequiredPieces قطعة • انقر على أي خلية لتعديل الكمية",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                OutlinedButton(
+                    onClick = { showClearConfirmDialog = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = RoseDanger),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.ClearAll, contentDescription = null, tint = RoseDanger, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("تصفير الجدول", fontSize = 11.sp, color = RoseDanger, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = { showSaveOrderDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isEditingBatch) AmberSecondary else EmeraldSuccess
+                    ),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(
+                        if (isEditingBatch) Icons.Default.Edit else Icons.Default.Add,
+                        contentDescription = null,
+                        tint = if (isEditingBatch) Color.Black else Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = if (isEditingBatch) "تعديل الطلبية" else "حفظ الطلبية",
+                        fontSize = 11.sp,
+                        color = if (isEditingBatch) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { showBulkConfirmDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("تأكيد للموردين", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onAddCustomer,
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("عميل", fontSize = 11.sp)
+                }
+
+                OutlinedButton(
+                    onClick = onShareMatrix,
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("تصدير", fontSize = 11.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // ============ حاوية الجدول ============
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ---------- (1) صف الرأس الثابت أعلى الشاشة ----------
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(headerHeight)
+                ) {
+                    // خلية الرأس الثابتة (الزاوية العلوية اليسرى)
+                    Box(
+                        modifier = Modifier
+                            .width(fixedColWidth)
+                            .height(headerHeight)
+                            .background(PrimaryBlue)
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "الصنف / السيارة",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // رأس أعمدة العملاء + الإجمالي (تمرير أفقي مشترك)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(headerHeight)
+                            .horizontalScroll(horizontalScrollState)
+                    ) {
+                        customers.forEachIndexed { idx, customer ->
+                            val gradient = customerGradients[idx % customerGradients.size]
+                            Box(
+                                modifier = Modifier
+                                    .width(customerColWidth)
+                                    .height(headerHeight)
+                                    .background(Brush.verticalGradient(gradient))
+                                    .padding(horizontal = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = customer.name,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .width(totalColWidth)
+                                .height(headerHeight)
+                                .background(AmberSecondary)
+                                .padding(horizontal = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "الإجمالي",
+                                color = Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+
+                // ---------- (2) القائمة الموحدة (تمرير عمودي متزامن) ----------
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(matrixRows) { row ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(rowHeight),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // الخلية الثابتة (اسم الصنف + السيارة) - تتحرك عموديًا مع الصف
+                            Box(
+                                modifier = Modifier
+                                    .width(fixedColWidth)
+                                    .height(rowHeight)
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Column {
+                                    Text(
+                                        text = row.part.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${row.part.carType} • ${row.part.carModel}",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            // خلايا العملاء + الإجمالي (نفس ScrollState الأفقي المشترك)
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(rowHeight)
+                                    .horizontalScroll(horizontalScrollState),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                customers.forEach { customer ->
+                                    val qty = row.customerQuantities[customer.id] ?: 0
+                                    Box(
+                                        modifier = Modifier
+                                            .width(customerColWidth)
+                                            .height(rowHeight)
+                                            .clickable {
+                                                cellToEdit = Triple(row.part, customer, qty)
+                                            }
+                                            .padding(4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (qty > 0) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(38.dp)
+                                                    .background(PrimaryLighter, RoundedCornerShape(8.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "$qty",
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = PrimaryBlue,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                        } else {
+                                            Text(
+                                                text = "-",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                fontSize = 16.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // إجمالي الصف
+                                Box(
+                                    modifier = Modifier
+                                        .width(totalColWidth)
+                                        .height(rowHeight)
+                                        .background(AmberLight.copy(alpha = 0.3f))
+                                        .padding(4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${row.totalQty}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (row.totalQty > 0) AmberSecondary else Color.Gray,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    }
+
+                    // ---------- (3) صف ملخص الإجماليات (آخر عنصر داخل نفس القائمة) ----------
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(summaryHeight),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(fixedColWidth)
+                                    .height(summaryHeight)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "إجمالي الكميات",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(summaryHeight)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .horizontalScroll(horizontalScrollState),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                var grandTotal = 0
+                                customers.forEach { customer ->
+                                    val colTotal = matrixRows.sumOf { it.customerQuantities[customer.id] ?: 0 }
+                                    grandTotal += colTotal
+                                    Box(
+                                        modifier = Modifier
+                                            .width(customerColWidth)
+                                            .height(summaryHeight)
+                                            .padding(4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$colTotal",
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.Black,
-                                            fontSize = 15.sp
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 13.sp
                                         )
                                     }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .width(totalColWidth)
+                                        .height(summaryHeight)
+                                        .background(AmberSecondary)
+                                        .padding(4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$grandTotal",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        fontSize = 15.sp
+                                    )
                                 }
                             }
                         }
@@ -662,6 +1034,7 @@ fun MatrixGroupView(
         }
     }
 
+    // ============ الحوارات (بدون أي تغيير) ============
     cellToEdit?.let { (part, customer, qty) ->
         EditMatrixCellDialog(
             part = part,
