@@ -390,31 +390,30 @@ fun SettingsScreen(
                         )
 
                         Button(
-                            onClick = {
-                                if (tempEmail.isBlank() || !tempEmail.contains("@")) {
-                                    Toast.makeText(context, "الرجاء كتابة بريدك الإلكتروني في الخانة أولاً", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    onSendVerificationCode(tempEmail.trim()) {
-                                        showVerifyEmailDialog = true
-                                    }
-                                }
-                            },
-                            modifier = Modifier.height(34.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isGoogleAccountVerified) EmeraldSuccess else PrimaryBlue
-                            ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                if (isGoogleAccountVerified) "الحساب موثق ✓ (إعادة إرسال)" else "إرسال رمز التوثيق تلقائياً",
-                                fontSize = 10.5.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+    onClick = {
+        val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+        if (tempEmail.isBlank() || !emailRegex.matches(tempEmail.trim())) {
+            Toast.makeText(context, "الرجاء كتابة بريد إلكتروني صحيح في الخانة أولاً", Toast.LENGTH_SHORT).show()
+        } else {
+            // إظهار واجهة توثيق حساب Google السحابية مباشرة دون فتح تطبيق البريد
+            showVerifyEmailDialog = true
+        }
+    },
+    modifier = Modifier.height(34.dp),
+    colors = ButtonDefaults.buttonColors(
+        containerColor = if (isGoogleAccountVerified) EmeraldSuccess else PrimaryBlue
+    ),
+    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+) {
+    Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+    Spacer(modifier = Modifier.width(4.dp))
+    Text(
+        if (isGoogleAccountVerified) "الحساب موثق ✓ (إعادة إرسال)" else "إرسال رمز التوثيق تلقائياً",
+        fontSize = 10.5.sp,
+        color = Color.White,
+        fontWeight = FontWeight.Bold
+    )
+}
 
                     // Cloud Sync Frequency Selector (المزامنة التلقائية المحفوظة)
                     Row(
@@ -1787,57 +1786,168 @@ fun SettingsScreen(
                                         { err ->
                                             verificationError = err
                                         }
-                                    )
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldSuccess),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("تأكيد الرمز")
-                            }
+// REQUIREMENT 11: Email Verification Dialog — التوليد والإرسال تلقائياً عبر الخدمة (بدون فتح تطبيق البريد)
+if (showVerifyEmailDialog) {
+    var emailInput by remember { mutableStateOf(googleAccountEmail) }
+    var codeInput by remember { mutableStateOf("") }
+    var codeSent by remember { mutableStateOf(false) }
+    var verificationError by remember { mutableStateOf<String?>(null) }
+    var isSending by remember { mutableStateOf(false) }
 
-                            OutlinedButton(
-                                onClick = {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_MAIN).apply {
-                                            addCategory(Intent.CATEGORY_APP_EMAIL)
-                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {
-                                        Toast.makeText(context, "يرجى فتح تطبيق البريد الخاص بك", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("فتح تطبيق البريد", fontSize = 11.sp)
-                            }
-                        }
+    val emailRegex = remember { Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$") }
 
-                        TextButton(
-                            onClick = {
-                                onSendVerificationCode(emailInput.trim()) {
+    AlertDialog(
+        onDismissRequest = { showVerifyEmailDialog = false },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CloudDone, contentDescription = null, tint = TechCyan)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("توثيق حساب Google بالسحابة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "سيتم توليد رمز تحقق عشوائي تلقائياً وإرساله إلى بريدك مباشرةً عبر خدمة السحابة، دون فتح تطبيق البريد.",
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = emailInput,
+                    onValueChange = {
+                        emailInput = it
+                        verificationError = null
+                    },
+                    label = { Text("بريد حساب Google") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !codeSent && !isSending
+                )
+
+                if (!codeSent) {
+                    Button(
+                        onClick = {
+                            val email = emailInput.trim()
+                            when {
+                                email.isBlank() -> verificationError = "يرجى كتابة البريد الإلكتروني أولاً"
+                                !emailRegex.matches(email) -> verificationError = "تنسيق البريد الإلكتروني غير صحيح"
+                                else -> {
+                                    isSending = true
                                     verificationError = null
+                                    onSetGoogleAccountEmail(email)
+                                    onSendVerificationCode(email) {
+                                        isSending = false
+                                        codeSent = true
+                                        verificationError = null
+                                        Toast.makeText(
+                                            context,
+                                            "تم توليد وإرسال رمز التحقق إلى $email تلقائياً",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
-                            },
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        ) {
-                            Text("إعادة إرسال الرمز للبريد", fontSize = 11.sp)
-                        }
+                            }
+                        },
+                        enabled = !isSending,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isSending) "جارٍ توليد وإرسال الرمز..." else "إرسال رمز التحقق إلى بريدي")
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = EmeraldLight),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = "✓ تم توليد وإرسال رمز تحقق عشوائي جديد إلى $emailInput بنجاح عبر الخدمة السحابية. راجع بريدك وأدخل الرمز أدناه:",
+                            fontSize = 11.sp,
+                            color = EmeraldSuccess,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
 
-                    if (verificationError != null) {
-                        Text(verificationError!!, color = RoseDanger, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = codeInput,
+                        onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) codeInput = it },
+                        label = { Text("أدخل رمز التحقق (6 أرقام)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Button(
+                        onClick = {
+                            if (codeInput.isBlank()) {
+                                verificationError = "يرجى إدخال رمز التحقق أولاً"
+                            } else {
+                                onConfirmVerificationCode(
+                                    codeInput.trim(),
+                                    {
+                                        showVerifyEmailDialog = false
+                                        Toast.makeText(context, "تم توثيق وتأكيد حساب Google بنجاح!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    { err -> verificationError = err }
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldSuccess),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("تأكيد الرمز")
+                    }
+
+                    TextButton(
+                        onClick = {
+                            val email = emailInput.trim()
+                            if (!emailRegex.matches(email)) {
+                                verificationError = "تنسيق البريد الإلكتروني غير صحيح"
+                            } else {
+                                isSending = true
+                                verificationError = null
+                                codeInput = ""
+                                onSendVerificationCode(email) {
+                                    isSending = false
+                                    Toast.makeText(
+                                        context,
+                                        "تم إعادة توليد وإرسال رمز تحقق جديد تلقائياً",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        },
+                        enabled = !isSending,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = if (isSending) "جارٍ إعادة الإرسال..." else "إعادة إرسال الرمز تلقائياً",
+                            fontSize = 11.sp
+                        )
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showVerifyEmailDialog = false }) {
-                    Text("إغلاق")
+
+                if (verificationError != null) {
+                    Text(
+                        text = verificationError!!,
+                        color = RoseDanger,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
-        )
-    }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = { showVerifyEmailDialog = false }) {
+                Text("إغلاق")
+            }
+        }
+    )
+}
 
     // QR Code Device Linking Dialog (Primary host)
     if (showQrLinkDialog) {
@@ -2171,22 +2281,22 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showMustVerifyDialog = false
-                        if (tempEmail.isNotBlank() && tempEmail.contains("@")) {
-                            onSendVerificationCode(tempEmail.trim()) {
-                                showVerifyEmailDialog = true
-                            }
-                        } else {
-                            Toast.makeText(context, "الرجاء كتابة البريد الإلكتروني في الخانة أولاً", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-                ) {
-                    Text("توثيق البريد الآن")
-                }
-            },
+    Button(
+        onClick = {
+            showMustVerifyDialog = false
+            val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+            if (tempEmail.isNotBlank() && emailRegex.matches(tempEmail.trim())) {
+                // فتح واجهة التوثيق مباشرة (بدون إرسال مسبق ولا فتح تطبيق البريد)
+                showVerifyEmailDialog = true
+            } else {
+                Toast.makeText(context, "الرجاء كتابة بريد إلكتروني صحيح في الخانة أولاً", Toast.LENGTH_SHORT).show()
+            }
+        },
+        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+    ) {
+        Text("توثيق البريد الآن")
+    }
+},
             dismissButton = {
                 TextButton(onClick = { showMustVerifyDialog = false }) { Text("إلغاء") }
             }
