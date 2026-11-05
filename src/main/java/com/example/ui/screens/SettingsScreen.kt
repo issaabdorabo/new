@@ -112,6 +112,7 @@ import com.example.ui.theme.RoseDanger
 import com.example.ui.theme.RoseLight
 import com.example.ui.theme.TechCyan
 import com.example.ui.theme.TechCyanLight
+import com.example.ui.theme.*
 
 @Composable
 fun SettingsScreen(
