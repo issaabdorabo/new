@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
-
+import com.example.ui.theme.*
 object AttachmentUtils {
 
     // Global state for opening in-app viewer dialog seamlessly
