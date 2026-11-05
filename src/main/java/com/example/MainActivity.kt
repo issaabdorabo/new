@@ -41,7 +41,7 @@ import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.screens.StockIssueScreen
-import com.example.ui.theme.AutoPartsProTheme
+import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.util.AdMobBanner
 import com.example.ui.util.AdMobManager
 import com.example.ui.util.AttachmentUtils
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
-            AutoPartsProTheme(themeMode = themeMode) {
+            MyApplicationTheme (themeMode = themeMode) {
                 // Layout direction according to appLanguage (RTL for Arabic, LTR for English)
                 val layoutDirection = if (appLanguage == "en") LayoutDirection.Ltr else LayoutDirection.Rtl
                 CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
