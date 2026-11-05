@@ -53,6 +53,7 @@ import com.example.data.model.PartWithInventory
 import com.example.ui.theme.AmberSecondary
 import com.example.ui.theme.EmeraldSuccess
 import com.example.ui.theme.PrimaryBlue
+import com.example.ui.theme.*
 
 @Composable
 fun DashboardScreen(
