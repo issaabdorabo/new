@@ -83,6 +83,10 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
+implementation("androidx.camera:camera-core:1.5.0")
+implementation("androidx.camera:camera-camera2:1.5.0")
+implementation("androidx.camera:camera-lifecycle:1.5.0")
+implementation("androidx.camera:camera-view:1.5.0")
   implementation(libs.play.services.ads)
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
