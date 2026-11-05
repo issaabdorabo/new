@@ -84,6 +84,7 @@ import com.example.ui.util.ExportUtils
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.ui.theme.*
 
 @Composable
 fun ConfirmDeleteAttachmentDialog(
