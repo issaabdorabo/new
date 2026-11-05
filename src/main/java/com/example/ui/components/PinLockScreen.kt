@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AmberSecondary
 import com.example.ui.theme.PrimaryBlue
+import com.example.ui.theme.*
 
 @Composable
 fun PinLockScreen(
