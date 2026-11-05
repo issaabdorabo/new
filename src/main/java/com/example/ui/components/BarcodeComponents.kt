@@ -93,7 +93,7 @@ import com.example.ui.theme.RoseLight
 import com.example.ui.theme.TechCyan
 import com.example.ui.theme.TechCyanLight
 import kotlin.math.abs
-
+import com.example.ui.theme.*
 /**
  * Authentic Barcode / QR Scanner Dialog with live CameraX preview feed & animated laser viewfinder.
  * Resolves camera opening problem and supports direct camera scanning, typing, or preset testing.
