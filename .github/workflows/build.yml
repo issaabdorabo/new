@@ -23,7 +23,7 @@ jobs:
           fi
         done
 
-    # 2. إصلاح تلقائي لملف settings.gradle.kts إذا كان مجلد app مفقوداً
+    # 2. إصلاح تلقائي لملف settings.gradle.kts (مهم جداً لأن مشروعك لا يحتوي على مجلد app)
     - name: Fix settings.gradle.kts
       run: |
         if [ ! -d "app" ]; then
@@ -32,42 +32,35 @@ jobs:
           sed -i '/project(":app").projectDir/d' settings.gradle.kts
         fi
 
-    # 3. إنشاء ملف التوقيع
+    # 3. التحقق من ملف Firebase الحقيقي (حذفنا إنشاء الملف الوهمي)
+    - name: Verify real google-services.json
+      env:
+        GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      run: |
+        # إذا لم يكن الملف موجوداً في المستودع، قم باستعادته من الـ Secrets
+        if [ ! -f google-services.json ]; then
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            echo "Restored google-services.json from GitHub Secret."
+          else
+            echo "::error::google-services.json is missing! Please add it to the repository or Secrets."
+            exit 1
+          fi
+        fi
+        
+        # التأكد من أنه ليس مشروعاً وهمياً
+        if grep -qE '"project_id": *"(remixed-project-id|dummy-project)"' google-services.json; then
+          echo "::error::google-services.json contains a placeholder project_id."
+          exit 1
+        fi
+
+    # 4. إنشاء ملف التوقيع وطباعة البصمة
     - name: Generate Debug Keystore
       run: |
-        keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
-
-    # 4. استخراج اسم الحزمة وإنشاء ملف Firebase وهمي متطابق
-    - name: Create Dummy google-services.json Dynamically
-      run: |
-        # قراءة اسم الحزمة من ملف build.gradle.kts
-        PKG_NAME=$(grep "applicationId" build.gradle.kts | grep -o '".*"' | tr -d '"' | head -1)
-        echo "Detected Package Name: $PKG_NAME"
-        
-        # إنشاء ملف google-services.json باستخدام اسم الحزمة المكتشف
-        cat << EOF > google-services.json
-        {
-          "project_info": {
-            "project_number": "1234567890",
-            "project_id": "dummy-project",
-            "storage_bucket": "dummy-project.appspot.com"
-          },
-          "client": [
-            {
-              "client_info": {
-                "mobilesdk_app_id": "1:1234567890:android:1234567890",
-                "android_client_info": {
-                  "package_name": "$PKG_NAME"
-                }
-              },
-              "oauth_client": [],
-              "api_key": [{"current_key": "AIzaSyDummyKey"}],
-              "services": {"appinvite_service": {"other_platform_oauth_client": []}}
-            }
-          ],
-          "configuration_version": "1"
-        }
-        EOF
+        mkdir -p ~/.android
+        keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+        echo "================= SHA-1 FINGERPRINT ================="
+        keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep "SHA1:"
 
     - name: set up JDK 17
       uses: actions/setup-java@v4
